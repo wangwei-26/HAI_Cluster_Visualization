@@ -422,8 +422,10 @@ def update_SNP_distance(linelist, organism, active_cell, table_data):
     try:
         tree_file = glob.glob(tree_path)[0]
         encoded_image = base64.b64encode(open(tree_file, 'rb').read()).decode()
-    except:
-        return [""]
+    except IndexError:  # In case the file is not found
+        return html.Div("SNP file not found.")
+    except Exception as e:  # Handle any other errors gracefully
+        return html.Div(f"An error occurred: {str(e)}")
 
     return [f"data:image/png;base64,{encoded_image}"]
 
