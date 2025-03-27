@@ -361,7 +361,7 @@ def update_SNP_distance(linelist, organism, active_cell, table_data):
         previous_isolate_number = 0
 
     # Construct SNP path dynamically based on selected organism and subcluster name
-    SNP_path = f'C:/Users/try8/OneDrive - CDC/Documents/results/SNP cluster monitoring/Subcluster_Detection/Visualization/Internal_visualization/tree/{organism}/{subcluster_name}-{month_list2[-1]}_SNP_matrix.txt'
+    SNP_path = f'tree/{organism}/{subcluster_name}-{month_list2[-1]}_SNP_matrix.txt'
 
     try:
         SNP_file = glob.glob(SNP_path)[0]
@@ -418,7 +418,7 @@ def update_SNP_distance(linelist, organism, active_cell, table_data):
         subcluster_name = selected_row['subcluster_id']
 
     ## Load the .pgn phylogenetic tree
-    tree_path = f'C:/Users/try8/OneDrive - CDC/Documents/results/SNP cluster monitoring/Subcluster_Detection/Visualization/Internal_visualization/tree/{organism}/{subcluster_name}-{month_list2[-1]}_tree.png'
+    tree_path = f'tree/{organism}/{subcluster_name}-{month_list2[-1]}_tree.png'
     try:
         tree_file = glob.glob(tree_path)[0]
         encoded_image = base64.b64encode(open(tree_file, 'rb').read()).decode()
