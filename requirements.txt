@@ -3,3 +3,5 @@ pandas
 plotly
 openpyxl
 gunicorn
+dash-bootstrap-components
+numpy
