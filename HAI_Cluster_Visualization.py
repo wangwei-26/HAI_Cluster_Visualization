@@ -287,9 +287,9 @@ def display_related_data(active_cell, table_data, page_current):
 )
 def update_bar_chart(linelist):
     df = pd.DataFrame(linelist)
-    print(df.columns)
     number_list = []
     isolate_list = []
+    hovertext_list = []
     for i in range(len(month_list)):
         month = month_list2[i]
         print(month)
@@ -298,21 +298,25 @@ def update_bar_chart(linelist):
             number_list.append(len(target_rows))
             targeted_isolates = target_rows['HAI_WGS_ID'].tolist()
             isolate_list.append(targeted_isolates)
+            hovertext_list.append(','.join(targeted_isolates))
         else:
             number_list.append(0)
             isolate_list.append(None)
+            hovertext_list.append('')
     bar_df = pd.DataFrame({
             "month": month_list,
             "number": number_list,
-            "isolates": isolate_list
-        })
-    print(bar_df)
+            "isolates": isolate_list,
+            "hovertext": hovertext_list
+    })
     # Create the bar chart
     fig = go.Figure(data=[
         go.Bar(
             x=bar_df['month'],
             y=bar_df['number'],
-            marker=dict(color="blue")
+            marker=dict(color="blue"),
+            hovertext=bar_df['hovertext'],
+            hoverinfo="text"
         )
     ])
 
