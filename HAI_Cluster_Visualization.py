@@ -11,7 +11,7 @@ import base64
 month_list = ['2023-11','2023-12','2024-01', '2024-02', '2024-03', '2024-04', '2024-05', '2024-06', '2024-07', '2024-08',
               '2024-09','2024-10','2024-11','2024-12','2025-01','2025-02']###########################################################
 month_list2 = ['11.2023','12.2023','1.2024','2.2024','3.2024','4.2024','5.2024','6.2024','7.2024','8.2024','9.2024',
-               '10.2024','11.2024','12.2024','1.2025','2.2025']####################################################################
+               '10.2024','11.2024','12.2024','1.2025','2.2025','3.2025']####################################################################
 
 # Dictionary of state abbreviations
 state_abbreviations = {
@@ -163,7 +163,7 @@ app.layout = html.Div([
     html.Div(id="output-container_1"),
     html.Div(id="output-container_2"),
     dcc.Store(id="stored-table-data"),
-    html.H3("New uploaded of each month"),
+    html.H3("Uploaded curve"),
     dcc.Slider(
         id="timeline-slider",
         min=0,
@@ -174,13 +174,20 @@ app.layout = html.Div([
         tooltip={"placement": "bottom", "always_visible": True}
     ),
     dcc.Graph(id="bar-chart"),
-    html.H3("Location of sequencing labs and Phylogenetic tree"),
-    html.Div([
-        dcc.Graph(id="us-map"),
-        html.Img(id="tree-image", style={'max-width': '100%', "max-height": "100%", 'height': 'auto', "width": "auto", "display": "block", "margin": "auto"})
-    ], style={'display': 'flex', 'justify-content': 'space-around', 'align-items': 'center' }),
-    html.Button("Download HTML", id="download-btn"),
-    dcc.Download(id="download-html")
+    html.H3("SNP distance"),
+    html.Div(id="SNP-distance"),
+    html.H3("Phylogenetic Tree"),
+    html.Img(
+        id="tree-image",
+        style={
+            'max-width': '100%',
+            "max-height": "100%",
+            'height': 'auto',
+            "width": "auto",
+            "display": "block",
+            "margin": "auto"
+        }
+    )
 ])
 
 
@@ -292,7 +299,6 @@ def update_bar_chart(linelist):
     hovertext_list = []
     for i in range(len(month_list)):
         month = month_list2[i]
-        print(month)
         target_rows = df[df['Added_month'].astype(str) == month]
         if not target_rows.empty:
             number_list.append(len(target_rows))
@@ -332,18 +338,75 @@ def update_bar_chart(linelist):
 
     return fig
 
+
 @app.callback(
-    [Output("us-map", "figure"),
-     Output("tree-image", "src")],
+    Output("SNP-distance", "children"),
     [Input("stored-table-data", "data"),
-    Input("timeline-slider", "value"),
+     Input("sheet-radio", "value"),
+     Input("data-table", "active_cell")],
+    [State("data-table", "data")]
+)
+def update_SNP_distance(linelist, organism, active_cell, table_data):
+    if not linelist:
+        return html.Div("No data available.")  # Return a message if linelist is empty
+
+    # Linelist data to a DataFrame
+    df_linelist = pd.DataFrame(linelist)
+
+    # Check if a specific cell is selected and handle accordingly
+    if active_cell:
+        row_index = active_cell['row']
+        selected_row = table_data[row_index]
+        subcluster_name = selected_row['subcluster_id']
+        previous_isolate_number = 0
+
+    # Construct SNP path dynamically based on selected organism and subcluster name
+    SNP_path = f'C:/Users/try8/OneDrive - CDC/Documents/results/SNP cluster monitoring/Subcluster_Detection/Visualization/Internal_visualization/tree/{organism}/{subcluster_name}-{month_list2[-1]}_SNP_matrix.txt'
+
+    try:
+        SNP_file = glob.glob(SNP_path)[0]
+        SNP_df = pd.read_csv(SNP_file, delimiter='\t')
+    except IndexError:  # In case the file is not found
+        return html.Div("SNP file not found.")
+    except Exception as e:  # Handle any other errors gracefully
+        return html.Div(f"An error occurred: {str(e)}")
+
+    # If SNP_df is empty, provide an alternative message
+    if SNP_df.empty:
+        return html.Div("SNP matrix is empty.")
+
+    # Create and return a DataTable with the SNP data
+    return html.Div(
+        dash_table.DataTable(
+            id="SNP-distance-table",  # Change ID if needed
+            data=SNP_df.to_dict('records'),
+            columns=[{"name": col, "id": col} for col in SNP_df.columns],
+            style_table={
+                'width': '100%',  # Let the table use the full width of the parent container
+                'maxWidth': '100%',  # Ensure the table doesn't exceed 100% of the container width
+                'overflowX': 'auto',  # Allow horizontal scrolling if the content overflows
+                'overflowY': 'auto',  # Allow vertical scrolling if the content is long
+                'height': 'auto',  # Let the height adjust dynamically
+            },
+            style_cell={
+                'textAlign': 'center',  # Align text to the center
+                'minWidth': '100px',  # Set minimum cell width
+                'maxWidth': '300px',  # Set maximum cell width
+                'whiteSpace': 'normal',  # Allow word wrapping if needed
+            },
+        )
+    )
+
+@app.callback(
+    [Output("tree-image", "src")],
+    [Input("stored-table-data", "data"),
      Input("sheet-radio", "value"),
      Input("data-table", "active_cell")],
      [State("data-table", "data")]
 )
-def update_us_map(linelist, slider_month, organism, active_cell, table_data):
+def update_SNP_distance(linelist, organism, active_cell, table_data):
     if not linelist:
-        return go.Figure()
+        return [""]
 
     # Linelist data to a dataframe
     df_linelist = pd.DataFrame(linelist)
@@ -353,175 +416,16 @@ def update_us_map(linelist, slider_month, organism, active_cell, table_data):
         row_index = active_cell['row']
         selected_row = table_data[row_index]
         subcluster_name = selected_row['subcluster_id']
-        previous_isolate_number = 0
 
     ## Load the .pgn phylogenetic tree
-    clicked_month = month_list[slider_month]
-    print(subcluster_name)
-    tree_path = f'tree/{organism}/{subcluster_name}-{month_list[-1]}_tree.png'
+    tree_path = f'C:/Users/try8/OneDrive - CDC/Documents/results/SNP cluster monitoring/Subcluster_Detection/Visualization/Internal_visualization/tree/{organism}/{subcluster_name}-{month_list2[-1]}_tree.png'
     try:
         tree_file = glob.glob(tree_path)[0]
         encoded_image = base64.b64encode(open(tree_file, 'rb').read()).decode()
     except:
-        pass
+        return [""]
 
-
-    ## Prepare the us map
-    selected_month = month_list[: (slider_month+1)]
-    number_of_total_isolates = len(df_linelist[df_linelist['Added_month'].isin(selected_month)])
-    state_map_df = pd.DataFrame(columns=['State', 'Value', 'lat', 'lon'])
-    if any(item in df_linelist['Added_month'].values for item in selected_month):
-        selected_df = df_linelist[df_linelist['Added_month'].isin(selected_month)]
-        states = selected_df["Sequencing lab"].tolist()
-        if len(states) == 0:
-            print("No state information is available.")
-            # State and its count dictionary
-        state_count = {}
-        for state in states:
-            if state not in state_count.keys():
-                state_count[state] = 1
-            else:
-                state_count[state] += 1
-
-        # Create a DataFrame for the map with counts
-        state_map_df = pd.DataFrame({
-            "State": list(state_count.keys()),
-            "Value": list(state_count.values())
-        })
-        state_map_df["lat"] = state_map_df["State"].apply(lambda x: state_coords[x]["lat"])
-        state_map_df["lon"] = state_map_df["State"].apply(lambda x: state_coords[x]["lon"])
-
-    fig = go.Figure()
-
-    # Define the radius for offsetting circles
-    base_radius = 0.6  # Adjust this for desired spacing
-
-    # Output: when isolate is available but phylogenetic tree is not
-    if number_of_total_isolates == 1:
-        for _, row in state_map_df.iterrows():
-            # Generate non-overlapping positions using polar coordinates
-            angles = np.linspace(0, 2 * np.pi, row["Value"], endpoint=False)
-            lats = row["lat"] + base_radius * np.sin(angles)
-            lons = row["lon"] + base_radius * np.cos(angles)
-
-            # Add each circle to the map
-            fig.add_trace(
-                go.Scattergeo(
-                    locationmode="USA-states",
-                    lon=lons,
-                    lat=lats,
-                    marker=dict(
-                        size=8,
-                        color="blue",
-                        opacity=0.7,
-                        line=dict(width=1, color="darkblue")
-                    ),
-                    showlegend=False
-                )
-            )
-
-        # Update map layout
-        fig.update_layout(
-            geo=dict(
-                scope="usa",
-                projection_type="albers usa"
-            )
-        )
-        if previous_isolate_number == 0:
-            return fig, "data:image/png;base64,"
-        else:
-            return fig, f"data:image/png;base64,{encoded_image}"
-
-    # Output: when both isolates and phylogenetic tree are available
-    elif number_of_total_isolates > 1:
-        for _, row in state_map_df.iterrows():
-            # Generate non-overlapping positions using polar coordinates
-            angles = np.linspace(0, 2 * np.pi, row["Value"], endpoint=False)
-            lats = row["lat"] + base_radius * np.sin(angles)
-            lons = row["lon"] + base_radius * np.cos(angles)
-
-            # Add each circle to the map
-            fig.add_trace(
-                go.Scattergeo(
-                    locationmode="USA-states",
-                    lon=lons,
-                    lat=lats,
-                    marker=dict(
-                        size=8,
-                        color="blue",
-                        opacity=0.7,
-                        line=dict(width=1, color="darkblue")
-                    ),
-                    showlegend=False
-                )
-            )
-
-        # Update map layout
-        fig.update_layout(
-            geo=dict(
-                scope="usa",
-                projection_type="albers usa"
-            )
-        )
-
-        return fig, f"data:image/png;base64,{encoded_image}"
-
-    else:
-        lats = [0]
-        lons = [0]
-
-        fig = go.Figure()
-
-        # Add each circle to the map based on multiple coordinates
-        for lat, lon in zip(lats, lons):
-            fig.add_trace(
-                go.Scattergeo(
-                    locationmode="USA-states",
-                    lon=[lon],
-                    lat=[lat],
-                    marker=dict(
-                        size=0,
-                        color="blue",
-                        opacity=0.7,
-                        line=dict(width=1, color="darkblue")
-                    ),
-                    showlegend=False
-                )
-            )
-
-        # Update map layout for U.S. map projection
-        fig.update_layout(
-            geo=dict(
-                scope="usa",
-                projection_type="albers usa",
-                showland=True,
-                landcolor="lightgray"
-            )
-        )
-
-        return fig, "data:image/png;base64,"
-
-@app.callback(
-    Output("download-html", "data"),
-    Input("download-btn", "n_clicks"),
-    prevent_initial_call=True
-)
-def download_html(n_clicks):
-    html_content = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>My Dash App</title>
-    </head>
-    <body>
-        <h1>My Dash App</h1>
-        <p>This is a sample Dash app content.</p>
-    </body>
-    </html>
-    """
-    return dcc.send_string(html_content, "dash_app.html")
+    return [f"data:image/png;base64,{encoded_image}"]
 
 
 if __name__ == "__main__":
